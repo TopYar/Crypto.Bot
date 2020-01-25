@@ -139,48 +139,6 @@ namespace Crypto.Bot
                                     user.SendKeyboard(Bot, "main");
                                 }
 
-                                // Добавляем аккаунт биржи
-                                try
-                                {
-                                    string[] keys = message.Text.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                                    if (user.WaitingReply == "addAccount")
-                                    {
-                                        user.WaitingReply = "";
-                                        if (keys.Length != 2 || !keys[0].StartsWith("K-") || !keys[1].StartsWith("S-"))
-                                        {
-                                            throw new ArgumentException("Пожалуйста, введите две строчки в указанном формате\n");
-                                        }
-                                    }
-                                    if (keys.Length == 2 && keys[0].StartsWith("K-") && keys[1].StartsWith("S-"))
-                                    {
-                                        user._key = keys[0];
-                                        user._secret = keys[1];
-
-                                        try
-                                        {
-                                            string check = user.GetBalance();
-                                            if (check == "Error")
-                                                throw new ArgumentException("Похоже вы ввели неверные ключи");
-                                            user.Save();
-
-                                            user.SendKeyboard(Bot, "main", "Ваш аккаунт успешно добавлен!");
-
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
-                                                      replyToMessageId: message.MessageId);
-                                        }
-
-
-                                    }
-                                }
-                                catch (ArgumentException ex)
-                                {
-                                    await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
-                                           replyToMessageId: message.MessageId);
-                                }
-
                                 
                                 if (message.Text == "/start")
                                 {
@@ -249,6 +207,50 @@ namespace Crypto.Bot
                                             }
                                     }
 
+                                }
+                                else
+                                {
+                                    // Добавляем аккаунт биржи
+                                    try
+                                    {
+                                        string[] keys = message.Text.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (user.WaitingReply == "addAccount")
+                                        {
+                                            user.WaitingReply = "";
+                                            if (keys.Length != 2 || !keys[0].StartsWith("K-") || !keys[1].StartsWith("S-"))
+                                            {
+                                                throw new ArgumentException("Пожалуйста, введите две строчки в указанном формате\n");
+                                            }
+                                        }
+                                        if (keys.Length == 2 && keys[0].StartsWith("K-") && keys[1].StartsWith("S-"))
+                                        {
+                                            user._key = keys[0];
+                                            user._secret = keys[1];
+
+                                            try
+                                            {
+                                                string check = user.GetBalance();
+                                                if (check == "Error")
+                                                    throw new ArgumentException("Похоже вы ввели неверные ключи");
+                                                user.Save();
+
+                                                user.SendKeyboard(Bot, "main", "Ваш аккаунт успешно добавлен!");
+
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
+                                                          replyToMessageId: message.MessageId);
+                                            }
+
+
+                                        }
+                                    }
+                                    catch (ArgumentException ex)
+                                    {
+                                        await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
+                                               replyToMessageId: message.MessageId);
+                                    }
                                 }
 
                                 offset = update.Id + 1;
