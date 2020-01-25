@@ -11,5 +11,6 @@ namespace Crypto.Bot
         public string uid { get; set; }
         public int server_date { get; set; }
         public Dictionary<string, string> balances { get; set; }
+        public Dictionary<string, string> reserved { get; set; }
     }
 }

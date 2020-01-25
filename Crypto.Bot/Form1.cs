@@ -7,10 +7,15 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
 using Newtonsoft.Json;
+using Alx.Web;
+using System.Net;
+using Telegram.Bot.Types.InputFiles;
+using System.Drawing.Imaging;
 
 namespace Crypto.Bot
 {
@@ -27,6 +32,9 @@ namespace Crypto.Bot
         public Form1()
         {
             InitializeComponent();
+            /*makepicture("https://ru.investing.com/crypto/bitcoin/btc-usd-chart?cid=1031677".Trim());
+            pictureBox1.Visible = true;
+            pictureBox1.Image = ByteToImage(picbytes);*/
 
             DirectoryInfo directoryInfo = new DirectoryInfo("../Debug");
 
@@ -124,94 +132,127 @@ namespace Crypto.Bot
                                 else
                                 {
                                     user = new User(message.Chat.Id);
-                                    user.Save();
+                                    
                                     users.Add(user.id, user);
+
+                                    // Отправляем стартовую клавиатуру
+                                    user.SendKeyboard(Bot, "main");
                                 }
 
-                                if (user.waitingReply == "addAccount")
+                                // Добавляем аккаунт биржи
+                                try
                                 {
-                                    try
+                                    string[] keys = message.Text.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                    if (user.WaitingReply == "addAccount")
                                     {
-                                        string[] keys = message.Text.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                                        if (keys.Length != 2)
+                                        user.WaitingReply = "";
+                                        if (keys.Length != 2 || !keys[0].StartsWith("K-") || !keys[1].StartsWith("S-"))
                                         {
-                                            throw new ArgumentException("Пожалуйста, введите две строчки в указанном формате");
-                                        }
-                                        else
-                                        {
-                                            if (!keys[0].StartsWith("K-") || !keys[1].StartsWith("S-"))
-                                            {
-                                                user.waitingReply = "";
-                                                user.Save();
-                                                throw new ArgumentException("Пожалуйста, введите две строчки в указанном формате\nПопробовать снова /add");
-                                            }
-                                            user._key = keys[0];
-                                            user._secret = keys[1];
-
-                                            try
-                                            {
-                                                string check = user.GetBalance();
-                                                if (check == "Error")
-                                                    throw new ArgumentException("Похоже вы ввели неверные ключи");
-                                                user.Save();
-
-                                                await Bot.SendTextMessageAsync(message.Chat.Id, "Your key: " + keys[0] + "\nYour secret: " + keys[1],
-                                                           replyToMessageId: message.MessageId);
-
-                                                user.waitingReply = "";
-                                                user.Save();
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
-                                                          replyToMessageId: message.MessageId);
-                                            }
-
-
+                                            throw new ArgumentException("Пожалуйста, введите две строчки в указанном формате\n");
                                         }
                                     }
-                                    catch (ArgumentException ex)
+                                    if (keys.Length == 2 && keys[0].StartsWith("K-") && keys[1].StartsWith("S-"))
                                     {
-                                        await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
-                                               replyToMessageId: message.MessageId);
+                                        user._key = keys[0];
+                                        user._secret = keys[1];
+
+                                        try
+                                        {
+                                            string check = user.GetBalance();
+                                            if (check == "Error")
+                                                throw new ArgumentException("Похоже вы ввели неверные ключи");
+                                            user.Save();
+
+                                            user.SendKeyboard(Bot, "main", "Ваш аккаунт успешно добавлен!");
+
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
+                                                      replyToMessageId: message.MessageId);
+                                        }
+
+
                                     }
                                 }
-                                else
+                                catch (ArgumentException ex)
                                 {
-                                    if (message.Text == "/start")
-                                    {
-
-                                        await Bot.SendTextMessageAsync(message.Chat.Id, "тест",
-                                               replyToMessageId: message.MessageId);
-                                    }
-                                    else if (message.Text == "/add")
-                                    {
-                                        user.waitingReply = "addAccount";
-                                        await Bot.SendTextMessageAsync(message.Chat.Id, @"Введите публичный и секретный ключ в следующем виде:
-
-K-f5c61f526446102b3c7af11909cfffa72ad8b4e7
-S-5272b9cb568506c205e2e5a056586c116fe5d1e1",
-                                               replyToMessageId: message.MessageId);
-                                    }
-                                    else if (message.Text == "/keys")
-                                    {
-                                        if (user._key != null && user._secret != null)
-                                            await Bot.SendTextMessageAsync(message.Chat.Id, "Ваш публичный ключ: \n" + users[message.Chat.Id]._key,
-                                                   replyToMessageId: message.MessageId);
-                                        else
-                                            await Bot.SendTextMessageAsync(message.Chat.Id, "Вы пока не добавили свой аккаунт. Для добавления, введите /add",
-                                                  replyToMessageId: message.MessageId);
-                                    }
-                                    else if (message.Text == "/balance")
-                                    {
-                                        Console.WriteLine(users[message.Chat.Id].GetBalance());
-
-                                        await Bot.SendTextMessageAsync(message.Chat.Id, users[message.Chat.Id].GetBalance(),
-                                                  replyToMessageId: message.MessageId);
-                                    }
+                                    await Bot.SendTextMessageAsync(message.Chat.Id, ex.Message,
+                                           replyToMessageId: message.MessageId);
                                 }
+
+                                
+                                if (message.Text == "/start")
+                                {
+
+                                    // Отправляем стартовую клавиатуру
+                                    user.SendKeyboard(Bot, "main", "🤖 Привет, я Crypto Trading Бот! \n\nВот, что я умею:\n" +
+                                        "• управлять вашим аккаунтом на бирже Exmo\n• выводить график курсов криптовалют\n• оповещать об изменениях цены");
+                                }
+                                else if (message.Text == "/add" || message.Text == "➕ Добавить аккаунт" || message.Text == "✏️ Заменить ключи")
+                                {
+                                    user.WaitingReply = "addAccount";
+                                    await Bot.SendTextMessageAsync(message.Chat.Id, "Введите публичный и секретный ключ в следующем виде: \n\n" 
+                                        + "K-f5c61f526446102b3c7af11909cfffa72ad8b4e6\nS-5272b9cb568506c205e2e5a056586c116fe5d1e0",
+                                           replyToMessageId: message.MessageId);
+                                }
+                                else if (message.Text == "/keys")
+                                {
+                                    if (user._key != null && user._secret != null)
+                                        await Bot.SendTextMessageAsync(message.Chat.Id, "Ваш публичный ключ: \n" + users[message.Chat.Id]._key,
+                                               replyToMessageId: message.MessageId);
+                                    else
+                                        await Bot.SendTextMessageAsync(message.Chat.Id, "Вы пока не добавили свой аккаунт. Для добавления, введите /add",
+                                              replyToMessageId: message.MessageId);
+                                }
+                                else if (message.Text == "/balance" || message.Text == "💰 Баланс")
+                                {
+                                    Console.WriteLine(users[message.Chat.Id].GetBalance());
+
+                                    await Bot.SendTextMessageAsync(message.Chat.Id, users[message.Chat.Id].GetBalance(),
+                                              replyToMessageId: message.MessageId);
+                                }
+                                else if (message.Text == "/charts" || message.Text == "📊 Графики")
+                                {
+                                    Capture("BTCUSD", message.Chat.Id);
+                                }
+                                else if (message.Text == "/notifications" || message.Text == "🔔 Оповещения")
+                                {
+                                    
+                                }
+                                else if (message.Text == "/settings" || message.Text == "🛠 Настройки")
+                                {
+                                    user.SendKeyboard(Bot, "settings");
+                                }
+                                else if (message.Text == "/remove_acc" || message.Text == "❌ Отвязать аккаунт")
+                                {
+                                    user._key = null;
+                                    user._secret = null;
+                                    user.Save();
+                                    user.SendKeyboard(Bot, "main", "Аккаунт успешно отвязан!");
+                                }
+                                else if (message.Text == "/back" || message.Text == "⬅️ Назад")
+                                {
+                                    switch (user.Keyboard)
+                                    {
+                                        case "settings":
+                                        case "notifications":
+                                        case "charts":
+                                            {
+                                                user.SendKeyboard(Bot, "main");
+                                                break;
+                                            }
+                                        default:
+                                            {
+                                                user.SendKeyboard(Bot, "main");
+                                                break;
+                                            }
+                                    }
+
+                                }
+
+                                offset = update.Id + 1;
                             }
-                            offset = update.Id + 1;
                         }
                     }
                 }
@@ -235,15 +276,15 @@ S-5272b9cb568506c205e2e5a056586c116fe5d1e1",
                 Invoke(tryagain_Show);
                 Console.WriteLine(ex.Message);
             }
-            /*catch (Exception ex)
+            catch (Exception ex)
             {
-                label1.Text = "Something went wrong (check your internet connection)";
+                label1.Text = "Something went wrong (probably with your internet connection)";
                 label1.ForeColor = Color.Red;
 
                 tryagain.Text = "Try again";
                 Invoke(tryagain_Show);
                 Console.WriteLine(ex.Message);
-            }*/
+            }
         }
         void HideAll()
         {
@@ -302,6 +343,67 @@ S-5272b9cb568506c205e2e5a056586c116fe5d1e1",
                 }
             }
             return instance;
+        }
+
+        async protected void Capture(string pair, long id)
+        {
+            var mes = await Bot.SendTextMessageAsync(id, "Пожалуйста, ожидайте...");
+            string output = "output.png";
+
+            string customerKey = "dc7d7f";
+            string secretPhrase = ""; //leave secret phrase empty, if not needed
+
+            var options = new Dictionary<string, string>();
+            // mandatory parameter
+            options.Add("url", "https://ru.tradingview.com/symbols/BTCUSD/");
+            // all next parameters are optional, see our webtite screenshot API guide for more details
+            options.Add("dimension", "1030x1200"); // or "1366xfull" for full length screenshot
+            options.Add("device", "desktop");
+            options.Add("format", "png");
+            options.Add("cacheLimit", "0");
+            options.Add("delay", "200");
+            options.Add("zoom", "100");
+
+            ScreenshotMachine sm = new ScreenshotMachine(customerKey, secretPhrase);
+
+            string apiUrl = sm.GenerateScreenshotApiUrl(options);
+            //use final apiUrl where needed
+            Console.WriteLine(apiUrl);
+
+            //or save screenshot directly
+
+            await Task.Run(() => new WebClient().DownloadFile(apiUrl, output));
+            Image img = Image.FromFile(output);
+
+            output = "output2.png";
+            Bitmap crop = (Bitmap)Crop(img, new Rectangle(30, 540, 976, 530));
+            crop.Save(output, ImageFormat.Png);
+            using (FileStream fs = System.IO.File.OpenRead(output))
+            {
+                InputOnlineFile inputOnlineFile = new InputOnlineFile(fs, "BTC/USD.png");
+                await Bot.DeleteMessageAsync(id, mes.MessageId);
+                await Bot.SendPhotoAsync(id, inputOnlineFile, "BTC/USD graphics");
+
+            }
+
+            Console.WriteLine("Screenshot saved as " + output);
+
+        }
+        public Image Crop(Image image, Rectangle selection)
+        {
+            Bitmap bmp = image as Bitmap;
+
+            // Check if it is a bitmap:
+            if (bmp == null)
+                throw new ArgumentException("No valid bitmap");
+
+            // Crop the image:
+            Bitmap cropBmp = bmp.Clone(selection, bmp.PixelFormat);
+
+            // Release the resources:
+            image.Dispose();
+
+            return cropBmp;
         }
     }
 }

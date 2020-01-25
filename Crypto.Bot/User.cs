@@ -14,7 +14,36 @@ namespace Crypto.Bot
         ExmoApi api;
         public string _key;
         public string _secret;
-        public string waitingReply;
+        string waitingReply;
+
+        public string WaitingReply
+        {
+            get
+            {
+                return waitingReply;
+            }
+
+            set
+            {
+                waitingReply = value;
+                this.Save();
+            }
+        }
+        string keyboard;
+
+        public string Keyboard
+        {
+            get
+            {
+                return keyboard;
+            }
+
+            set
+            {
+                keyboard = value;
+                this.Save();
+            }
+        }
         public User()
         {
 
@@ -66,10 +95,11 @@ namespace Crypto.Bot
             string res = "";
             try
             {
-                foreach (KeyValuePair<string, string> Currency in wallet.balances)
+                Wallet wal = wallet;
+                foreach (KeyValuePair<string, string> Currency in wal.balances)
                 {
-                    if (Currency.Value != "0")
-                        res += (Currency.Key + ": " + Currency.Value) + "\n";
+                    if (Currency.Value != "0" || wal.reserved[Currency.Key] != "0" || Currency.Key == "BTC" || Currency.Key == "USD")
+                        res += (Currency.Key + ": " + Currency.Value) + (wal.reserved[Currency.Key] != "0" ? " (в ордерах: " + wal.reserved[Currency.Key] + ")" : "") + "\n";
                 }
 
             }
@@ -78,6 +108,99 @@ namespace Crypto.Bot
                 res = "Error";
             }
             return res;
+        }
+
+        public Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup GetReplyMarkups()
+        {
+            dynamic keyboard = null;
+            if (this.keyboard == "main")
+            {
+                if (_key == null || _secret == null)
+                    keyboard = new Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup
+                    {
+                        Keyboard = new[] {
+                                                new[] // row 1
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("➕ Добавить аккаунт"),
+
+                                                },
+                                            },
+                        ResizeKeyboard = true
+                    };
+                else
+                {
+                    keyboard = new Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup
+                    {
+                        Keyboard = new[] {
+                                                new[] // row 1
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("💰 Баланс"),
+
+                                                },
+                                                new[] // row 2
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("📊 Графики"),
+
+                                                },
+                                                new[] // row 3
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("🔔 Оповещения"),
+
+                                                },
+                                                new[] // row 4
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("🛠 Настройки"),
+
+                                                },
+                                            },
+                        ResizeKeyboard = true
+                    };
+                }
+            }
+            else if (this.keyboard == "settings")
+            {
+                keyboard = new Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup
+                {
+                    Keyboard = new[] {
+                                                new[] // row 2
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("✏️ Заменить ключи"),
+                                                },
+                                                new[] // row 2
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("❌ Отвязать аккаунт"),
+                                                },
+                                                new[] // row 3
+                                                {
+                                                    new Telegram.Bot.Types.ReplyMarkups.KeyboardButton("⬅️ Назад"),
+
+                                                },
+                                            },
+                    ResizeKeyboard = true
+                };
+            }
+                return keyboard;
+        }
+
+        public async void SendKeyboard(Telegram.Bot.TelegramBotClient Bot, string type, string customMessage = "")
+        {
+            Keyboard = type;
+            string message = null;
+
+            if (customMessage != "")
+            {
+                message = customMessage;
+            }
+            else if (type == "main")
+            {
+                message = "🤖 Привет, я Crypto Trading Бот. Рад вас видеть!";
+            }
+            else if (type == "settings") {
+                message = "Здесь вы можете изменить секретные ключи или отвязать свой аккаунт.";
+            }
+
+            var keyboard = this.GetReplyMarkups();
+            await Bot.SendTextMessageAsync(chatId: id, text: message, replyMarkup: keyboard);
         }
 
     }
