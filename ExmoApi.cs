@@ -18,7 +18,7 @@ namespace Crypto.Bot
         // API settings
         private string _key;
         private string _secret;
-        private string _url = "http://api.exmo.com/v1/{0}";
+        private string _url = "https://api.exmo.com/v1/{0}";
 
         static ExmoApi()
         {
@@ -40,6 +40,7 @@ namespace Crypto.Bot
         {
             using (var client = new HttpClient())
             {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
                 var n = Interlocked.Increment(ref _nounce);
                 req.Add("nonce", Convert.ToString(n));
                 var message = ToQueryString(req);
@@ -56,40 +57,23 @@ namespace Crypto.Bot
             }
         }
 
-        public async Task<HttpStatusCode> ApiQueryAsyncEx(string apiName, IDictionary<string, string> req)
-        {
-            using (var client = new HttpClient())
-            {
-                var n = Interlocked.Increment(ref _nounce);
-                req.Add("nonce", Convert.ToString(n));
-                var message = ToQueryString(req);
-
-                var sign = Sign(_secret, message);
-
-                var content = new FormUrlEncodedContent(req);
-                content.Headers.Add("Sign", sign);
-                content.Headers.Add("Key", _key);
-
-                var response = await client.PostAsync(string.Format(_url, apiName), content);
-                await Task.Factory.StartNew(async () =>
-                {
-                    var data = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine(data);
-                });
-
-                return response.StatusCode;
-            }
-        }
-
+        /// <summary>
+        /// Метод позволяет составит запрос к бирже и получить ответ
+        /// </summary>
+        /// <param name="apiName">Вызываемый метод API</param>
+        /// <param name="req">Запрос</param>
+        /// <returns>Строка, ответ биржи на запрос</returns>
         public string ApiQuery(string apiName, IDictionary<string, string> req)
         {
             using (var wb = new WebClient())
             {
                 req.Add("nonce", Convert.ToString(_nounce++));
+                // Строковое представление запроса к бирже
                 var message = ToQueryString(req);
-
+                // Вычисление подписи запроса
                 var sign = Sign(_secret, message);
 
+                // Добавление HTTP-заголовков: подпись и публичный ключ
                 wb.Headers.Add("Sign", sign);
                 wb.Headers.Add("Key", _key);
 
